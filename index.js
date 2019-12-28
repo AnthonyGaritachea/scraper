@@ -3,11 +3,11 @@ const cheerio = require('cheerio');
 const moment = require('moment');
 
 let mockOutput = {
-    estimatedTime: '1:00AM - 3:55AM',
+    value: '$74.00', // OR value: 'SOLD OUT'
+    departureAndArrival: '1:00AM - 3:55AM',
     duration: '2h 55m',
     transportationType: '5811 Connecting Bus',
-    value: '$74.00'
-} 
+}
 
 const scrapeAmtrak = async () => {
     try {
@@ -36,6 +36,17 @@ const scrapeAmtrak = async () => {
         await page.waitFor(2000);
         await page.click('#findtrains');
         await page.waitFor(5000);
+        let html = await page.content();
+        let $ = await cheerio.load(html)
+        let results = $('div[class="train-select-heading"]').map((index, element) => {
+           let value = $(element).parent().parent().parent().find('span.radio-button__text').text().match(/\$[\d]{2}\.[\d]{2}/g);
+           value = (value === null) ? 'SOLD OUT' : value.toString();
+           let departureAndArrival = $(element).find($('.time_lg')).text().toUpperCase().replace(/\s/g, '').replace(/M/, 'M - ').trimLeft();
+           let duration = $(element).find($('.duration_lg')).text();
+           let transportationType = $(element).find('a').first().text().trim();
+            return { value, departureAndArrival, duration, transportationType }
+        }).get();
+        console.log(results)
     } catch (err) {
         console.log(err);
         if(err.name === 'TimeoutError'){
