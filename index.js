@@ -1,12 +1,24 @@
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
 const moment = require('moment');
+const mongoose = require('mongoose');
+const Ticket = require('./models/Ticket');
 
 let mockOutput = {
     value: '$74.00', // OR value: 'SOLD OUT'
     departureAndArrival: '1:00AM - 3:55AM',
     duration: '2h 55m',
     transportationType: '5811 Connecting Bus',
+}
+
+mongoose.connect('mongodb://127.0.0.1:27017/amtrak', {useNewUrlParser: true})
+
+let friday = 5; // 5th day of week 
+let today = moment().isoWeekday();
+if(today > friday){
+    var dayOfDeparture = moment().add(1, 'weeks').isoWeekday(friday).format('MM/DD/YYYY');
+} else {
+    var dayOfDeparture = moment().day('Friday').format('MM/DD/YYYY')
 }
 
 const scrapeAmtrak = async () => {
@@ -25,7 +37,7 @@ const scrapeAmtrak = async () => {
         await page.keyboard.type('Bakersfield');
         await page.click('#BFD');
         await page.focus('#page-content > section:nth-child(2) > div.home > article > div.hero-banner-and-search-widget__wrapper > div > div.search-trip.am-js__search-trip.search-trip--active-one-way > form > div > div.search-trip__widget-wrapper_inner > div.search-trip__inputs-container > div.search-trip__selected-type-container > div.search-trip--hidden.search-trip__one-way > div > div.search-trip-depart.am-js__search-trip-depart > div > div.search-trip-calendar__active > div > div.search-trip-calendar__active_cont > input')
-        await page.keyboard.type(moment().day('Friday').format('MM/DD/YYYY'));
+        await page.keyboard.type(dayOfDeparture);
         await page.waitFor(2000)
         await page.click('.search-trip-travelers__active_counter');
         await page.waitFor(2000)
@@ -44,6 +56,13 @@ const scrapeAmtrak = async () => {
            let departureAndArrival = $(element).find($('.time_lg')).text().toUpperCase().replace(/\s/g, '').replace(/M/, 'M - ').trimLeft();
            let duration = $(element).find($('.duration_lg')).text();
            let transportationType = $(element).find('a').first().text().trim();
+           let ticket = new Ticket({
+                value,
+                departureAndArrival,
+                duration,
+                transportationType
+           });
+           ticket.save();
             return { value, departureAndArrival, duration, transportationType }
         }).get();
         console.log(results)
